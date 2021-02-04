@@ -72,8 +72,8 @@ class Blockchain {
 
                 // badHashOnPurpose and badPreviousHashOnPurpose are here to
                 // simulate bad blocks and help the mentor with the tests
-                const badHashOnPurpose = block.height % 3 === 0;
-                const badPreviousHashOnPurpose = block.height % 5 === 0;
+                const badHashOnPurpose = block.height % 5 === 0;
+                const badPreviousHashOnPurpose = block.height % 6 === 0;
 
                 if (self.chain.length > 0) {
                     block.previousBlockHash = badPreviousHashOnPurpose ?
@@ -84,8 +84,15 @@ class Blockchain {
                 block.hash = badHashOnPurpose && !block.isGenesis() ?
                     (block.calculateHash()).split("").reverse().join("") :
                     block.calculateHash();
+
+                const errors = await self.validateChain();
+                if (errors) {
+                    return reject(errors);
+                }
+
                 self.chain.push(block);
                 self.height++;
+
                 resolve(block);
             } catch (e) {
                 reject(e);
@@ -199,14 +206,13 @@ class Blockchain {
     getStarsByWalletAddress (address) {
         let self = this;
         // Important reminder to avoid future rage -> it's not "new Promise.all()". It's just "Promise.all()".
-        return Promise.all(self.chain.map(block => block.getBData()))
-            .then(dataFromBlocks => dataFromBlocks
-                    .filter(data => data && data.address === address)
-                    .map(data => ({
-                        address: data.address,
-                        star: data.star,
-                    }))
-            );
+        return self.chain
+            .map(block => block.getBData())
+            .filter(data => data && data.address === address)
+            .map(data => ({
+                address: data.address,
+                star: data.star,
+            }));
     }
 
     /**
@@ -227,7 +233,7 @@ class Blockchain {
                     !validatedBlock[index] &&
                         errorMsgs.push(`Block #${block.height} has been tempered with.`);
                     !block.isGenesis() && previousBlockHash !== block.previousBlockHash &&
-                        errorMsgs.push(`Wrong previous block hash for block ${block.height}.`);
+                        errorMsgs.push(`Wrong previous block hash for block #${block.height}.`);
 
                     previousBlockHash = block.hash;
 
@@ -235,7 +241,7 @@ class Blockchain {
                     errorMsg && errorLog.push(errorMsg);
                 });
 
-                return errorLog;
+                return errorLog.length > 0 ? errorLog : null;
             });
     }
 
